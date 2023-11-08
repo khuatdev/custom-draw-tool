@@ -4,9 +4,9 @@
 Draw.loadPlugin(function(ui) {
 
 	// Adds numbered toggle property
-	Editor.commonVertexProperties.push({name: 'numbered', dispName: 'Numbered', type: 'bool', defVal: true, isVisible: function(state, format)
+	Editor.commonVertexProperties.push({name: 'numbered', dispName: 'Numbered', type: 'int', defVal: 1, isVisible: function(state, format)
 	{
-		var graph = format.editorUi.editor.graph;
+		const graph = format.editorUi.editor.graph;
 
 		return graph.view.redrawNumberShape != null;
 	}, onChange: function(graph, newValue)
@@ -14,40 +14,54 @@ Draw.loadPlugin(function(ui) {
 		graph.refresh();
 	}});
 
-	var graph = ui.editor.graph;
-	var enabled = true;
-	var counter = 0;
+	const graph = ui.editor.graph;
+	let enabled = true;
 	
-	var graphViewResetValidationState = graph.view.resetValidationState;
+	const graphViewResetValidationState = graph.view.resetValidationState;
 	
 	graph.view.resetValidationState = function()
 	{
 		graphViewResetValidationState.apply(this, arguments);
-		this.numberCounter = 0;
+		this.numberCounter = [];
+    this.currentLevel = 0;
 	};
 	
-	var graphViewValidateCellState = graph.view.validateCellState;
+	const graphViewValidateCellState = graph.view.validateCellState;
 	
 	graph.view.validateCellState = function(cell, recurse)
 	{
-		var state = graphViewValidateCellState.apply(this, arguments);
+		const state = graphViewValidateCellState.apply(this, arguments);
 		recurse = (recurse != null) ? recurse : true;
 		
 		if (recurse && state != null && graph.model.isVertex(state.cell) &&
-			mxUtils.getValue(state.style, 'numbered', 1) == 1)
+			mxUtils.getValue(state.style, 'numbered', 0) != 0)
 		{
-			this.numberCounter++;
+      if (this.currentLevel < mxUtils.getValue(state.style, 'numbered', 0)) {
+        this.numberCounter.push(0);
+      }
+      else if (this.currentLevel > mxUtils.getValue(state.style, 'numbered', 0)) {
+        this.numberCounter.pop();
+      }
+      this.currentLevel = mxUtils.getValue(state.style, 'numbered', 0);
+			this.numberCounter[this.currentLevel - 1]++;
 			this.redrawNumberShape(state);
 		}
 		
 		return state;
 	};
 	
+  const getNumberCounter = (numberCounter) => {
+    console.log(numberCounter);
+    const number = numberCounter.reduce((acc, cur) => {
+      return acc + '.' + cur;
+    });
+    return number + '.';
+  };
 	graph.view.redrawNumberShape = function(state)
 	{
-		var numbered = mxUtils.getValue(state.style, 'numbered', 1) == 1;
-		var value = '<div style="padding:2px;border:1px solid gray;background:yellow;border-radius:2px;">' +
-			(this.numberCounter) + '</div>';
+		const numbered = mxUtils.getValue(state.style, 'numbered', 0) != 0;
+		const value = '<div style="padding:2px;border:1px solid gray;background:yellow;border-radius:2px;">' +
+			getNumberCounter(this.numberCounter) + '</div>';
 
 		if (enabled && numbered && graph.model.isVertex(state.cell) &&
 			state.shape != null && state.secondLabel == null)
@@ -70,8 +84,8 @@ Draw.loadPlugin(function(ui) {
 			}
 			else
 			{
-				var scale = graph.getView().getScale();
-				var bounds = new mxRectangle(state.x + state.width - 4 * scale, state.y + 4 * scale, 0, 0);
+				const scale = graph.getView().getScale();
+				const bounds = new mxRectangle(state.x + state.width - 4 * scale, state.y + 4 * scale, 0, 0);
 				state.secondLabel.value = value;
 				state.secondLabel.state = state;
 				state.secondLabel.scale = scale;
@@ -82,7 +96,7 @@ Draw.loadPlugin(function(ui) {
 	};
 
 	// Destroys the shape number
-	var destroy = graph.cellRenderer.destroy;
+	const destroy = graph.cellRenderer.destroy;
 	graph.cellRenderer.destroy = function(state)
 	{
 		destroy.apply(this, arguments);
@@ -103,7 +117,7 @@ Draw.loadPlugin(function(ui) {
 	mxResources.parse('number=Number');
 
     // Adds action
-    var action = ui.actions.addAction('number...', function()
+    const action = ui.actions.addAction('number...', function()
     {
 		enabled = !enabled;
 		graph.refresh();
@@ -112,8 +126,8 @@ Draw.loadPlugin(function(ui) {
     action.setToggleAction(true);
 	action.setSelectedCallback(function() { return enabled; });
     
-	var menu = ui.menus.get((urlParams['sketch'] == '1') ? 'extras' : 'view');
-	var oldFunct = menu.funct;
+	const menu = ui.menus.get((urlParams['sketch'] == '1') ? 'extras' : 'view');
+	const oldFunct = menu.funct;
 	
 	menu.funct = function(menu, parent)
 	{
