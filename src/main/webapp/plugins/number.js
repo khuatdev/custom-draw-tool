@@ -14,6 +14,30 @@ Draw.loadPlugin(function(ui) {
 		graph.refresh();
 	}});
 
+	Editor.commonVertexProperties.push({name: 'applied', dispName: 'Apply Number', type: 'bool', defVal: false, isVisible: function(state, format)
+	{
+		const graph = format.editorUi.editor.graph;
+
+		return graph.view.redrawNumberShape != null;
+	}, onChange: function(graph, applied){
+      const cells = graph.getSelectionCells();
+      cells.forEach(cell => {
+        const state = graph.view.getState(cell);
+        const displayNumber = state.secondLabel.numberCounter;
+        if (applied == 1) {
+          if (cell.value.startsWith(displayNumber)) {
+            return;
+          }
+          cell.setValue(displayNumber + cell.value);
+        } else {
+          if (cell.value.startsWith(displayNumber)) {
+            cell.setValue(cell.value.replace(displayNumber, ''));
+          }
+        }
+      });
+    }
+  });
+  
 	const graph = ui.editor.graph;
 	let enabled = true;
 	
@@ -51,7 +75,6 @@ Draw.loadPlugin(function(ui) {
 	};
 	
   const getNumberCounter = (numberCounter) => {
-    console.log(numberCounter);
     const number = numberCounter.reduce((acc, cur) => {
       return acc + '.' + cur;
     });
@@ -60,9 +83,10 @@ Draw.loadPlugin(function(ui) {
 	graph.view.redrawNumberShape = function(state)
 	{
 		const numbered = mxUtils.getValue(state.style, 'numbered', 0) != 0;
-		const value = '<div style="padding:2px;border:1px solid gray;background:yellow;border-radius:2px;">' +
-			getNumberCounter(this.numberCounter) + '</div>';
-
+    const displayNumber = getNumberCounter(this.numberCounter);
+		const value = `
+      <div style="padding:2px;border:1px solid gray;background:yellow;border-radius:2px;">${displayNumber}</div>
+    `;
 		if (enabled && numbered && graph.model.isVertex(state.cell) &&
 			state.shape != null && state.secondLabel == null)
 		{
@@ -86,10 +110,11 @@ Draw.loadPlugin(function(ui) {
 			{
 				const scale = graph.getView().getScale();
 				const bounds = new mxRectangle(state.x + state.width - 4 * scale, state.y + 4 * scale, 0, 0);
-				state.secondLabel.value = value;
+				state.secondLabel.value = value.trim();
 				state.secondLabel.state = state;
 				state.secondLabel.scale = scale;
 				state.secondLabel.bounds = bounds;
+				state.secondLabel.numberCounter = displayNumber;
 				state.secondLabel.redraw();
 			}
 		}
